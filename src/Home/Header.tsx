@@ -1,24 +1,50 @@
 import React from 'react';
-import { View, TouchableOpacity, Image, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Image, Text, StyleSheet, Alert } from 'react-native';
 import { useFontSize } from '../FontSizeContext';
+import { useRoute } from '@react-navigation/native';
+import { summarizeContent } from '../utils/useGemini'; // Import hàm gọi API Gemini
 
-const Header = ({ navigation }: { navigation: any }) => {
+const Header = ({ navigation, newsContent }: { navigation: any, newsContent?: string }) => {
   const { toggleFontSize } = useFontSize();
+  const route = useRoute();
+
+  // Kiểm tra nếu đang ở màn hình NewsDetail
+  const isNewsDetail = route.name === 'NewsDetail';
+
+  // Hàm gọi API Gemini khi bấm vào icon Gemini
+  const handleSummarize = async () => {
+    if (!newsContent) {
+      Alert.alert("Error", "No content available to summarize.");
+      return;
+    }
+
+    try {
+      const summary = await summarizeContent(newsContent);
+      Alert.alert("Summary", summary);
+    } catch (error) {
+      Alert.alert("Error", "Failed to summarize content.");
+    }
+  };
 
   return (
     <View style={styles.header}>
-      {/* Button to toggle font size */}
       <TouchableOpacity onPress={toggleFontSize} style={styles.button}>
         <Text style={styles.text}>Aa</Text>
       </TouchableOpacity>
 
-      {/* Logo in the center */}
-      <Image source={require('../assets/news-logo.png')} style={styles.logo} />
-
-      {/* Navigate to Login screen when user icon is clicked */}
-      <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.button}>
-        <Image source={require('../assets/user-icon.png')} style={styles.icon} />
+      <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+        <Image source={require('../assets/news-logo.png')} style={styles.logo} />
       </TouchableOpacity>
+
+      {isNewsDetail ? (
+        <TouchableOpacity onPress={handleSummarize} style={styles.button}>
+          <Image source={require('../assets/gemini.png')} style={styles.icon} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.button}>
+          <Image source={require('../assets/user-icon.png')} style={styles.icon} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

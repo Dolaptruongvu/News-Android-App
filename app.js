@@ -6,7 +6,6 @@ const AppError = require("./utils/appError");
 const userRoutes = require("./routes/userRoutes");
 const newsRoutes = require("./routes/newsRoutes");
 const globalErrorHandler = require("./controllers/errorController");
-const viewRouter = require("./routes/viewsRoutes");
 const cors = require("cors");
 
 // app area
@@ -16,18 +15,15 @@ app.enable("trust proxy");
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// Body parser, đọc dữ liệu từ body vào req.body
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
-// morgan để đọc log từ middleware
 app.use(morgan("common"));
 
-// CORS để frontend có thể gọi API
 app.use(
   cors({
-    origin: ["http://127.0.0.1:3000"],
+    origin: ["http://127.0.0.1:5000"],
     credentials: true,
   })
 );
@@ -47,9 +43,6 @@ app.use("/api/v1/users", userRoutes);
 // News routes
 app.use("/api/v1/news", newsRoutes);
 
-// View router
-app.use("/", viewRouter);
-
 // Test router
 app.use("/test", (req, res) => {
   res.json({ statement: "Welcome to News App API!" });
@@ -58,4 +51,4 @@ app.use("/test", (req, res) => {
 // Global Error Handling Middleware
 app.use(globalErrorHandler);
 
-module.exports = { app };
+module.exports = app;

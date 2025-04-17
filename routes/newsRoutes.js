@@ -11,6 +11,7 @@ router.get("/", newsController.getAllNews);
 
 router.get("/:id", newsController.getNewsById);
 
+router.post("/ask", newsController.queryKnowledgeBase);
 // 🔹 Các route dưới đây chỉ dành cho admin
 router.post(
   "/",

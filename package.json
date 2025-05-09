@@ -1,5 +1,5 @@
 {
-  "name": "FrontEnd",
+  "name": "newsfrontendapp",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -10,17 +10,19 @@
     "test": "jest"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@react-navigation/native": "^7.0.17",
     "@react-navigation/stack": "^7.2.1",
-    "FrontEnd": "file:",
+    "newsfrontendapp": "file:",
     "postcss-value-parser": "^4.2.0",
     "react": "19.0.0",
     "react-native": "0.78.1",
-    "react-native-gesture-handler": "^2.24.0",
+    "react-native-gesture-handler": "^2.25.0",
     "react-native-image-picker": "^8.2.0",
     "react-native-markdown-display": "^7.0.2",
-    "react-native-safe-area-context": "^5.3.0",
-    "react-native-screens": "^4.9.2"
+    "react-native-safe-area-context": "^5.4.0",
+    "react-native-screens": "^4.9.2",
+    "react-native-tts": "^4.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

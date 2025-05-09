@@ -1,0 +1,42 @@
+CREATE DATABASE mongo_datasource
+WITH ENGINE = 'mongodb',
+PARAMETERS = {
+    "host": "mongodb+srv://21522795:admin@cluster0.kdwqh.mongodb.net/newsApp?retryWrites=true&w=majority&appName=Cluster0"
+};
+
+CREATE KNOWLEDGE_BASE news_kb_lc -- Đặt tên mới để phân biệt (lc = LangChain)
+USING
+    -- Sử dụng cấu trúc JSON để chỉ định provider là 'langchain'
+    embedding_model = {
+       "provider": "huggingface", -- Chỉ định dùng lớp tích hợp LangChain
+       "class": "HuggingFaceEmbeddings", -- Tên lớp embedding của LangChain cho Hugging Face
+       "model": "sentence-transformers/all-mpnet-base-v2" -- Model Sentence Transformer bạn muốn dùng
+       -- Lưu ý: Không cần API key cho loại model này
+    },
+
+    -- Bỏ qua reranking và storage như trước
+    id_column = '_id',
+    content_columns = ['title', 'content'],       -- !!! THAY tên cột nếu cần !!!
+    metadata_columns = ['publishedAt', 'author'] -- !!! THAY tên cột nếu cần !!!
+;
+
+INSERT INTO news_kb_lc ( -- Chèn vào Knowledge Base mới tạo
+    SELECT
+        _id,
+        title,
+        content,
+        publishedAt,
+        author
+    FROM mongo_datasource.news -- !!! THAY 'news' bằng tên collection !!!
+);
+
+SELECT
+    id,                 -- ID gốc từ MongoDB (_id)
+    chunk_id,           -- ID của đoạn văn bản (chunk) được tạo ra
+    chunk_content,      -- Nội dung của đoạn văn bản liên quan được tìm thấy
+    metadata,           -- Metadata đi kèm (nếu có)
+    distance,           -- Khoảng cách vector (càng nhỏ càng liên quan)
+    relevance           -- Điểm độ liên quan (có thể NULL nếu không dùng reranker)
+FROM news_kb_lc         -- Tên Knowledge Base của bạn
+WHERE content = 'IonQ Inc. (NYSE:IONQ) shares were on ?' -- !!! THAY BẰNG CÂU HỎI TEST CỦA BẠN !!!
+LIMIT 5; 

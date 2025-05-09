@@ -231,7 +231,6 @@ exports.queryKnowledgeBase = catchAsync(async (req, res, next) => {
   const { question } = req.body;
   const knowledgeBaseName = "news_kb_lc";
 
-  // 1. Basic checks
   if (!question || typeof question !== "string" || question.trim() === "") {
     return next(new AppError("Please provide a 'question'.", 400));
   }
@@ -245,9 +244,7 @@ exports.queryKnowledgeBase = catchAsync(async (req, res, next) => {
   let context = "";
   let mindsdbResult = null;
 
-  // 2. Query MindsDB
   try {
-    // Escape single quotes and backslashes for SQL query
     const escapedQuestion = question.replace(/'/g, "''").replace(/\\/g, "\\\\");
     const query = `
       SELECT chunk_content
@@ -257,76 +254,148 @@ exports.queryKnowledgeBase = catchAsync(async (req, res, next) => {
     `;
 
     console.log(" Querying MindsDB KB:", query);
-    mindsdbResult = await MindsDB.SQL.runQuery(query); // Assuming MindsDB SDK is initialized
+    mindsdbResult = await MindsDB.SQL.runQuery(query);
     console.log(
       " MindsDB KB Raw Result:",
       JSON.stringify(mindsdbResult, null, 2)
     );
 
     if (mindsdbResult?.type === "error") {
-      // Log the specific error message from MindsDB if available
       console.error(" MindsDB Query Error:", mindsdbResult.error_message);
       throw new Error(mindsdbResult.error_message || "MindsDB query failed");
     }
 
-    // 3. Prepare Context for Gemini
     if (mindsdbResult?.rows?.length > 0) {
       context = mindsdbResult.rows
-        .map((row) => row.chunk_content) // Get chunk_content
-        .filter((content) => content != null && content.trim() !== "") // Filter out null/empty
-        .join("\n\n---\n\n"); // Join the chunks
+        .map((row) => row.chunk_content)
+        .filter((content) => content != null && content.trim() !== "")
+        .join("\n\n---\n\n");
 
       if (!context) {
         console.log(" No valid chunk_content found in the result.");
-        context = "Relevant information not found in the knowledge base."; // English context
+        context = "Relevant information not found in the knowledge base.";
       } else {
         console.log("Context for Gemini prepared.");
       }
     } else {
       console.log(" Context not found (0 rows).");
-      context = "Relevant information not found in the knowledge base."; // English context
+      context = "Relevant information not found in the knowledge base.";
     }
   } catch (error) {
     console.error(" Error querying MindsDB:", error.message || error);
-    context = "An error occurred while retrieving context."; // English context
+    context = "An error occurred while retrieving context.";
   }
 
-  // 4. Call Gemini
   try {
     let prompt;
-    // Check if context is valid and not an error/not-found message
+
     if (
       context &&
       !context.startsWith("An error occurred") &&
       !context.startsWith("Relevant information not found")
     ) {
-      // Keep the Vietnamese prompt structure
-      prompt = `Dựa *chỉ* vào ngữ cảnh sau đây, hãy trả lời câu hỏi. Trả lời bằng tiếng anh. Nếu ngữ cảnh không đủ thông tin, hãy nói vậy.
+      prompt = `You are an AI assistant for a news application. Your primary goal is to answer questions based *exclusively* on the provided news context.
+Strictly adhere to the following instructions:
+1. Your answer MUST be derived *only* from the 'Context' section below.
+2. Do NOT use any external knowledge, personal opinions, or information not present in the context.
+3. Do NOT apologize or offer to search elsewhere if the information is not in the context.
+4. Answer in English.
 
-Ngữ cảnh:
+Context:
 """
 ${context}
 """
 
-Câu hỏi: ${question}
+Question: ${question}
 
-Trả lời:`;
+Answer:`;
     } else {
-      // Fallback prompt if context is missing or indicates an issue
-      // Keep the Vietnamese part of the prompt
       prompt = `${context}. Dựa trên kiến thức chung, hãy trả lời câu hỏi: ${question}`;
     }
 
     console.log("✨ Sending prompt to Gemini...");
     const result = await geminiModel.generateContent(prompt);
     const response = await result.response;
-    const answer = response.text(); // Ensure this method exists and returns text
+    const answer = response.text();
 
-    console.log("Gemini Answer Received."); // Using checkmark for consistency if desired
+    console.log("Gemini Answer Received.");
     res.status(200).json({ status: "success", answer: answer });
   } catch (error) {
-    // Log the specific error from Gemini API call
     console.error("Error calling Gemini API:", error.message || error);
     return next(new AppError("Could not generate AI answer.", 500));
+  }
+});
+
+exports.summarizeContent = catchAsync(async (req, res, next) => {
+  const { contentToSummarize } = req.body;
+
+  if (
+    !contentToSummarize ||
+    typeof contentToSummarize !== "string" ||
+    contentToSummarize.trim() === ""
+  ) {
+    return next(
+      new AppError(
+        "Please provide 'contentToSummarize' in the request body.",
+        400
+      )
+    );
+  }
+
+  if (!geminiInitialized || !geminiModel) {
+    console.error(
+      "Attempted to summarize when Gemini model is not initialized."
+    );
+    return next(
+      new AppError(
+        "AI summarization service is not ready. Please try again later.",
+        503
+      )
+    );
+  }
+
+  try {
+    const prompt = `Please summarize the following text concisely:\n\n"""\n${contentToSummarize}\n"""`;
+
+    console.log("✨ Sending summarization prompt to Gemini...");
+
+    const result = await geminiModel.generateContent(prompt);
+    const geminiResponse = await result.response;
+    const summaryText = geminiResponse.text();
+
+    if (!summaryText || summaryText.trim() === "") {
+      console.warn("⚠️ Gemini returned an empty summary.");
+      return res.status(200).json({
+        status: "success",
+        summary: "Could not generate a summary for the provided content.",
+        message: "AI model returned an empty summary.",
+      });
+    }
+
+    console.log("✅ Summary received from Gemini.");
+    res.status(200).json({
+      status: "success",
+      summary: summaryText,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Error calling Gemini API for summarization:",
+      error.message || error
+    );
+    if (error.response && error.response.data) {
+      console.error("Gemini Error Details:", error.response.data);
+    }
+    let userMessage = "Could not generate summary due to an AI service error.";
+    if (error.message && error.message.includes("RESOURCE_EXHAUSTED")) {
+      userMessage = "The AI service is currently busy. Please try again later.";
+    } else if (
+      error.message &&
+      error.message.toLowerCase().includes("safety")
+    ) {
+      userMessage =
+        "The content could not be summarized due to safety concerns.";
+    }
+
+    return next(new AppError(userMessage, 500));
   }
 });

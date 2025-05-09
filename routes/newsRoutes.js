@@ -10,7 +10,7 @@ router.get("/fetch", newsController.fetchAndStoreNews);
 router.get("/", newsController.getAllNews);
 
 router.get("/:id", newsController.getNewsById);
-
+router.post("/summarize", newsController.summarizeContent);
 router.post("/ask", newsController.queryKnowledgeBase);
 // 🔹 Các route dưới đây chỉ dành cho admin
 router.post(
